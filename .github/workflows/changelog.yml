@@ -25,7 +25,9 @@ jobs:
       - name: Install changeloggy
         run: go install github.com/sreallymatt/changeloggy@v0.1.0
       - name: Check changelog entry
-        if: "!contains(github.event.pull_request.labels.*.name, 'no-changelog-needed')"
+        if: |
+          !contains(github.event.pull_request.labels.*.name, 'no-changelog-needed') &&
+          !contains(github.event.pull_request.labels.*.name, 'github-actions')
         id: check
         run: changeloggy check --pr ${{ github.event.pull_request.number }}
       - name: Save types table on failure
