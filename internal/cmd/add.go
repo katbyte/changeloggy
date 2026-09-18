@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -26,6 +27,9 @@ Adds a new changelog entry for a pull request.
 If the pull request already has a changelog file, the entry is added to it in
 whatever format it is in. Otherwise one is created using the configured
 'entry_format' (hcl, md, or yml).
+
+With --replace, the pull request's existing changelog file is replaced by a new
+one in the configured 'entry_format'.
 
 Run 'changeloggy types' to see all available entry types.`,
 		Args: cobra.ExactArgs(1),
@@ -54,21 +58,21 @@ Run 'changeloggy types' to see all available entry types.`,
 
 			entriesDir := cfg.EntriesPathOrDefault()
 
-			filePath, err := entryfile.ForPR(entriesDir, pr)
+			existingPath, err := entryfile.ForPR(entriesDir, pr)
 			if err != nil {
 				return err
 			}
 
+			filePath := filepath.Join(entriesDir, fmt.Sprintf("%d.%s", pr, cfg.EntryFormatOrDefault()))
+
 			chs := changes.Entries{}
-			switch {
-			case filePath == "":
-				filePath = filepath.Join(entriesDir, fmt.Sprintf("%d.%s", pr, cfg.EntryFormatOrDefault()))
-			case !replace:
-				existing, err := entryfile.Read(filePath)
+			if existingPath != "" && !replace {
+				existing, err := entryfile.Read(existingPath)
 				if err != nil {
 					return err
 				}
 				chs = *existing
+				filePath = existingPath
 			}
 
 			if err := util.EnsureDir(filePath); err != nil {
@@ -79,6 +83,13 @@ Run 'changeloggy types' to see all available entry types.`,
 
 			if err := entryfile.Write(filePath, &chs); err != nil {
 				return err
+			}
+
+			// a replaced file in another format is only removed once the new one is written, so a failed write loses nothing
+			if existingPath != "" && existingPath != filePath {
+				if err := os.Remove(existingPath); err != nil {
+					return fmt.Errorf("removing replaced changelog entry file (%s): %w", existingPath, err)
+				}
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "added `%s` entry to `%s`\n", entryType, filePath)

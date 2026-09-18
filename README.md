@@ -55,7 +55,7 @@ Three formats are supported, and the file extension decides how a file is read, 
 formats. A PR with more than one entry file (e.g. both `77.hcl` and `77.md`) is an error.
 
 `changeloggy add` adds to a PR's existing entry file in whatever format it is in, and only uses `entry_format` when it
-has to create a new one.
+creates a new one: when the PR has no entry file yet, or when `--replace` swaps the existing file for a new one.
 
 The examples below all hold the same three entries, using types from the starter config that `changeloggy config init`
 creates.
