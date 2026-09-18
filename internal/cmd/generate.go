@@ -129,7 +129,9 @@ func parseChangesFromDirectory(cmd *cobra.Command, cfg *config.Config, directory
 		return nil, nil, err
 	}
 
-	warnSkipped(cmd, skipped)
+	for _, name := range skipped {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: filename is not a valid PR number\n", name)
+	}
 
 	for _, f := range files {
 		if err := parseChangesFromFile(cfg, f, grouped); err != nil {

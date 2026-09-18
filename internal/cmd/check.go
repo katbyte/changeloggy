@@ -74,7 +74,9 @@ func checkAll(cmd *cobra.Command, cfg *config.Config) error {
 		return err
 	}
 
-	warnSkipped(cmd, skipped)
+	for _, name := range skipped {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: filename is not a valid PR number\n", name)
+	}
 
 	if len(files) == 0 {
 		return fmt.Errorf("no changelog entry files found in %s", entriesDir)
@@ -91,12 +93,6 @@ func checkAll(cmd *cobra.Command, cfg *config.Config) error {
 
 	fmt.Fprintf(cmd.OutOrStdout(), "all files valid (%s across %d file(s))\n", entryCount(totalEntries), len(files))
 	return nil
-}
-
-func warnSkipped(cmd *cobra.Command, skipped []string) {
-	for _, name := range skipped {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: filename is not a valid PR number\n", name)
-	}
 }
 
 func validateFile(cfg *config.Config, filePath string) (int, error) {
