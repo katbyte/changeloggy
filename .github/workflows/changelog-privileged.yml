@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  comment:
+  comment-on-failure:
     if: github.event.workflow_run.conclusion == 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -29,13 +29,26 @@ jobs:
           merge-multiple: true
         continue-on-error: true
 
-      - name: Comment on missing changelog entry
+      - name: Validate PR number
+        id: meta
         if: steps.download.outcome == 'success'
+        run: |
+          IFS= read -r pr_number < artifacts/pr-number
+          if ! [[ "$pr_number" =~ ^[0-9]+$ ]]; then
+            echo "Invalid pr-number in artifact" >&2
+            exit 1
+          fi
+          echo "pr-number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on missing changelog entry
+        if: steps.download.outcome == 'success' && steps.meta.outcome == 'success'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ steps.meta.outputs.pr-number }}
         with:
           script: |
             const fs = require('fs')
-            const prNumber = parseInt(fs.readFileSync('artifacts/pr-number', 'utf8').trim())
+            const prNumber = parseInt(process.env.PR_NUMBER, 10)
             const types = fs.readFileSync('artifacts/types-table', 'utf8').trim()
             const marker = '<!-- changelog-missing -->'
             const body = [
@@ -63,10 +76,11 @@ jobs:
               "If this PR does not require a changelog entry, add the `no-changelog-needed` label."
             ].join("\n")
 
-            const { data: comments } = await github.rest.issues.listComments({
+            const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
+              per_page: 100
             })
 
             const botComments = comments.filter(c => c.user.login === 'github-actions[bot]')
@@ -86,4 +100,104 @@ jobs:
                 issue_number: prNumber,
                 body,
               })
+            }
+
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['missing-changelog-entry'],
+              })
+            } catch (error) {
+              core.warning(`Failed to add label: ${error.message}`)
+            }
+
+  remove-label-and-hide-comment:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Download check artifacts
+        id: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: changelog-check-*
+          path: artifacts/
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Validate PR number
+        id: meta
+        if: steps.download.outcome == 'success'
+        run: |
+          IFS= read -r pr_number < artifacts/pr-number
+          if ! [[ "$pr_number" =~ ^[0-9]+$ ]]; then
+            echo "Invalid pr-number in artifact" >&2
+            exit 1
+          fi
+          echo "pr-number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: Remove missing-changelog-entry label
+        if: steps.download.outcome == 'success' && steps.meta.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ steps.meta.outputs.pr-number }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10)
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: 'missing-changelog-entry',
+              })
+            } catch (error) {
+              if (error.status === 404) {
+                core.info('Label not present, nothing to remove')
+              } else {
+                core.warning(`Failed to remove label: ${error.message}`)
+              }
+            }
+
+      - name: Hide missing changelog comment
+        if: steps.download.outcome == 'success' && steps.meta.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ steps.meta.outputs.pr-number }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10)
+            const marker = '<!-- changelog-missing -->'
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100
+            })
+
+            const existing = comments.filter(c => c.user.login === 'github-actions[bot]').find(c => c.body.includes(marker))
+
+            if (existing) {
+              await github.graphql(`
+                mutation($subjectId: ID!) {
+                  minimizeComment(input: { subjectId: $subjectId, classifier: OUTDATED }) {
+                    minimizedComment {
+                      isMinimized
+                    }
+                  }
+                }
+              `, {
+                subjectId: existing.node_id,
+              })
+            } else {
+              core.info('No changelog comment found, nothing to hide')
             }
