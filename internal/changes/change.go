@@ -50,11 +50,11 @@ func (e *Entry) Validate(t config.EntryType) error {
 
 	re, err := regexp.Compile(*t.Regex)
 	if err != nil {
-		return fmt.Errorf("received an invalid regular expression (type %s): %w", e.Type, err)
+		return fmt.Errorf("received an invalid regular expression (type `%s`): %w", e.Type, err)
 	}
 
 	if !re.MatchString(e.Body) {
-		return fmt.Errorf("body does not match expected format (type %s), example:\n\n%s", e.Type, *t.Example)
+		return fmt.Errorf("body does not match expected format (type %q)\n\nreceived: %q\nexample:  %q\n\nregex: %s", e.Type, e.Body, *t.Example, re.String())
 	}
 
 	return nil
