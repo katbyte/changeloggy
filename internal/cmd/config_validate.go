@@ -22,7 +22,7 @@ Checks for:
   - Priority conflicts within the config (two kinds sharing the same priority)
   - Priority conflicts within a kind (two types sharing the same priority)
   - Template syntax errors
-  - Unsupported entry_format`,
+  - Unsupported config inputs`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load(*configPath)
 			if err != nil {
