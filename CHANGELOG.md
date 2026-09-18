@@ -1,3 +1,14 @@
+## v0.2.0 (September 18, 2026)
+
+Improvements:
+
+- cli: `add` - entry validation now prints more detail on error ([#28](https://github.com/sreallymatt/changeloggy/pull/28))
+- cli: `types` - add support for the `--table` flag ([#11](https://github.com/sreallymatt/changeloggy/pull/11))
+
+Bugs:
+
+- cli: `add` - fix new entry file write to no longer include an initial empty line ([#29](https://github.com/sreallymatt/changeloggy/pull/29))
+
 ## v0.1.0 (September 8, 2026)
 
 Initial release
