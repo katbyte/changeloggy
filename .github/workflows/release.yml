@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions: {}
 
@@ -21,10 +22,10 @@ jobs:
           go-version-file: .go-version
       - name: Extract release notes
         run: |
-          sed -n "/^## ${GITHUB_REF_NAME} /,/^## /{/^## /d;p}" CHANGELOG.md > release-notes.md
+          sed -n "/^## ${GITHUB_REF_NAME} /,/^## /{/^## /d;p}" CHANGELOG.md > /tmp/CHANGELOG.md
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           version: "~> v2"
-          args: release --clean --release-notes release-notes.md
+          args: release --clean --release-notes /tmp/CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
