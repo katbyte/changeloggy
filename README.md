@@ -19,13 +19,13 @@ changeloggy config init
 Add a changelog entry for a pull request:
 
 ```sh
-changeloggy add --pr 77 --type bug '`azurerm_linux_virtual_machine` - fix a crash when `boot_diagnostics` is removed'
+changeloggy add --pr 42 --type example "Feat: an example entry"
 ```
 
 Validate entries:
 
 ```sh
-changeloggy check --pr 77 # validate a single PR entry
+changeloggy check --pr 42 # validate a single PR entry
 changeloggy check          # validate all entries
 ```
 
