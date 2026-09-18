@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -79,7 +80,7 @@ Run 'changeloggy types' to see all available entry types.`,
 			newContent := hclwrite.NewFile()
 			gohcl.EncodeIntoBody(chs.WriteEntries(), newContent.Body())
 
-			if err := os.WriteFile(filePath, hclwrite.Format(newContent.Bytes()), 0o600); err != nil {
+			if err := os.WriteFile(filePath, bytes.TrimLeft(hclwrite.Format(newContent.Bytes()), "\n"), 0o600); err != nil {
 				return fmt.Errorf("writing to file (%s): %w", filePath, err)
 			}
 
