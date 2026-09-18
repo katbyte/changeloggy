@@ -15,6 +15,7 @@ const (
 	FileName           = ".changeloggy.hcl"
 	DefaultEntriesPath = ".changelog"
 	DefaultArchivePath = ".archive"
+	DefaultEntryFormat = "hcl"
 )
 
 type TypeEntry struct {
@@ -26,6 +27,7 @@ type Config struct {
 	ArchiveEntries          *bool   `hcl:"archive_entries,optional"`
 	ArchivePath             *string `hcl:"archive_path,optional"`
 	EntriesPath             *string `hcl:"entries_path,optional"`
+	EntryFormat             *string `hcl:"entry_format,optional"`
 	KindsMap                map[string]Kind
 	Types                   map[string]TypeEntry
 	ChangelogFile           string `hcl:"changelog_file"`
@@ -125,6 +127,12 @@ func (c *Config) Validate() (e []error) {
 		e = append(e, fmt.Errorf("invalid `default_version_increment` (`%s`): must be `major`, `minor`, or `patch`", c.DefaultVersionIncrement))
 	}
 
+	switch c.EntryFormatOrDefault() {
+	case "hcl", "md", "yml":
+	default:
+		e = append(e, fmt.Errorf("invalid `entry_format` (`%s`): must be `hcl`, `md`, or `yml`", c.EntryFormatOrDefault()))
+	}
+
 	e = append(e, c.ValidateKinds()...)
 
 	return
@@ -173,6 +181,13 @@ func (c *Config) EntriesPathOrDefault() string {
 		return c.ResolveRelativePath(*c.EntriesPath)
 	}
 	return c.ResolveRelativePath(DefaultEntriesPath)
+}
+
+func (c *Config) EntryFormatOrDefault() string {
+	if c.EntryFormat != nil {
+		return *c.EntryFormat
+	}
+	return DefaultEntryFormat
 }
 
 func (c *Config) ArchivePathOrDefault() string {

@@ -1,18 +1,15 @@
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/spf13/cobra"
 	"github.com/sreallymatt/changeloggy/internal/changes"
 	"github.com/sreallymatt/changeloggy/internal/config"
-	"github.com/sreallymatt/changeloggy/internal/hclparse"
+	"github.com/sreallymatt/changeloggy/internal/entryfile"
 	"github.com/sreallymatt/changeloggy/internal/util"
 )
 
@@ -28,7 +25,8 @@ func NewAddCommand(configPath *string) *cobra.Command {
 
 Adds a new changelog entry for a pull request.
 
-If no changelog file exists for the pull request number, one will be created.
+If no changelog file exists for the pull request number, one will be created
+using the configured 'entry_format' (hcl, md, or yml).
 
 Run 'changeloggy types' to see all available entry types.`,
 		Args: cobra.ExactArgs(1),
@@ -55,7 +53,7 @@ Run 'changeloggy types' to see all available entry types.`,
 				return fmt.Errorf("invalid changelog entry: %w", err)
 			}
 
-			filePath := filepath.Join(cfg.EntriesPathOrDefault(), fmt.Sprintf("%d.hcl", pr))
+			filePath := filepath.Join(cfg.EntriesPathOrDefault(), fmt.Sprintf("%d.%s", pr, cfg.EntryFormatOrDefault()))
 
 			if err := util.EnsureDir(filePath); err != nil {
 				return err
@@ -68,7 +66,7 @@ Run 'changeloggy types' to see all available entry types.`,
 
 			chs := changes.Entries{}
 			if !replace && !errors.Is(err, os.ErrNotExist) {
-				existing, err := hclparse.EntryFile(filePath)
+				existing, err := entryfile.Read(filePath)
 				if err != nil {
 					return err
 				}
@@ -77,11 +75,8 @@ Run 'changeloggy types' to see all available entry types.`,
 
 			chs.Changes = append(chs.Changes, ch)
 
-			newContent := hclwrite.NewFile()
-			gohcl.EncodeIntoBody(chs.WriteEntries(), newContent.Body())
-
-			if err := os.WriteFile(filePath, bytes.TrimLeft(hclwrite.Format(newContent.Bytes()), "\n"), 0o600); err != nil {
-				return fmt.Errorf("writing to file (%s): %w", filePath, err)
+			if err := entryfile.Write(filePath, &chs); err != nil {
+				return err
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "added `%s` entry to `%s`\n", entryType, filePath)

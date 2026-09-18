@@ -6,6 +6,7 @@ require (
 	github.com/hashicorp/go-azure-helpers v0.82.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/spf13/cobra v1.10.2
+	go.yaml.in/yaml/v3 v3.0.5
 )
 
 require (

@@ -21,7 +21,8 @@ Checks for:
   - Missing examples where regex is set
   - Priority conflicts within the config (two kinds sharing the same priority)
   - Priority conflicts within a kind (two types sharing the same priority)
-  - Template syntax errors`,
+  - Template syntax errors
+  - Unsupported entry_format`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load(*configPath)
 			if err != nil {

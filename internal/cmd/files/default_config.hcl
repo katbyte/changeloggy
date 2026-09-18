@@ -2,6 +2,7 @@
 # archive_path              = ".archive" # archive path, relative to the directory of the configuration file
 changelog_file            = "CHANGELOG.md" # changelog file path, relative to the directory of the configuration file
 default_version_increment = "minor" # default semver version increment, attempts to read `changelog_file` to determine the last release
+# entry_format              = "hcl" # format `changeloggy add` writes entry files in: `hcl`, `md`, or `yml`. Entry files in any format are always read
 
 format {
   date = "January 2, 2006"
