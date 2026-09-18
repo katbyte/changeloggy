@@ -78,9 +78,10 @@ change "bug" {
 
 ### Markdown (`77.md`)
 
-Each code block is labelled with its entry type (e.g. `` ```bug ``), and each line inside it is one entry of that type.
+The text after the opening fence is the entry type, and each line inside the block is one entry of that type.
 Blank lines are ignored. Any other text outside a code block is an error.
 
+````markdown
 ```enhancement
 `azurerm_kubernetes_cluster` - support for the `node_provisioning_profile` block
 `azurerm_storage_account` - improve validation for the `name` property
@@ -89,6 +90,7 @@ Blank lines are ignored. Any other text outside a code block is an error.
 ```bug
 `azurerm_linux_virtual_machine` - fix a crash when `boot_diagnostics` is removed
 ```
+````
 
 ### YAML (`77.yml` or `77.yaml`)
 
