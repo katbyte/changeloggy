@@ -76,9 +76,9 @@ func printTypesTable(cmd *cobra.Command, cfg *config.Config) error {
 		for _, t := range k.Types {
 			example := ""
 			if t.Example != nil {
-				example = fmt.Sprintf("`%s`", *t.Example)
+				example = *t.Example
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "| %s | `%s` | %s |\n", heading, t.Name, example)
+			fmt.Fprintf(cmd.OutOrStdout(), "| %s | %s | %s |\n", heading, t.Name, example)
 		}
 	}
 	return nil
