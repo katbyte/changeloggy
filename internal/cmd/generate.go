@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -122,57 +121,40 @@ func atomicWrite(dst string, content []byte) error {
 func parseChangesFromDirectory(cmd *cobra.Command, cfg *config.Config, directory string) (grouped map[string]map[int]*changes.Entries, parsed []string, err error) {
 	grouped = make(map[string]map[int]*changes.Entries)
 
-	files, err := os.ReadDir(directory)
+	files, skipped, err := entryfile.List(directory)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return grouped, nil, nil
 		}
-		return grouped, nil, fmt.Errorf("reading directory (%s): %w", directory, err)
+		return nil, nil, err
 	}
 
+	warnSkipped(cmd, skipped)
+
 	for _, f := range files {
-		ok, err := parseChangesFromFile(cmd, cfg, directory, f, grouped)
-		if err != nil {
+		if err := parseChangesFromFile(cfg, f, grouped); err != nil {
 			return nil, nil, err
 		}
-		if ok {
-			parsed = append(parsed, filepath.Join(directory, f.Name()))
-		}
+		parsed = append(parsed, f.Path)
 	}
 
 	return grouped, parsed, nil
 }
 
-// parseChangesFromFile adds the entries in file to result, returning false if file was skipped.
-func parseChangesFromFile(cmd *cobra.Command, cfg *config.Config, directory string, file os.DirEntry, result map[string]map[int]*changes.Entries) (bool, error) {
-	if file.IsDir() || !entryfile.Supported(file.Name()) {
-		return false, nil
-	}
-
-	pr, err := prFromFilename(file.Name())
+func parseChangesFromFile(cfg *config.Config, file entryfile.File, result map[string]map[int]*changes.Entries) error {
+	entries, err := entryfile.Read(file.Path)
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: filename is not a valid PR number: %v\n", file.Name(), err)
-		return false, nil
-	}
-
-	if pr < 1 {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: PR number must be greater than 0\n", file.Name())
-		return false, nil
-	}
-
-	entries, err := entryfile.Read(filepath.Join(directory, file.Name()))
-	if err != nil {
-		return false, err
+		return err
 	}
 
 	for i, change := range entries.Changes {
 		t, err := cfg.ResolveEntryType(change.Type)
 		if err != nil {
-			return false, fmt.Errorf("file (%s) entry %d: %w", file.Name(), i+1, err)
+			return fmt.Errorf("file (%s) entry %d: %w", file.Path, i+1, err)
 		}
 
 		if err := change.Validate(t.EntryType); err != nil {
-			return false, fmt.Errorf("file (%s) entry %d (%s): %w", file.Name(), i+1, change.Type, err)
+			return fmt.Errorf("file (%s) entry %d (%s): %w", file.Path, i+1, change.Type, err)
 		}
 
 		heading := root
@@ -189,17 +171,12 @@ func parseChangesFromFile(cmd *cobra.Command, cfg *config.Config, directory stri
 			result[heading][priority] = &changes.Entries{}
 		}
 
-		entries.Changes[i].PR = pr
+		entries.Changes[i].PR = file.PR
 		entries.Changes[i].Kind = t.Kind.Name
 		result[heading][priority].Add(entries.Changes[i])
 	}
 
-	return true, nil
-}
-
-func prFromFilename(name string) (int64, error) {
-	base := strings.TrimSuffix(name, filepath.Ext(name))
-	return strconv.ParseInt(base, 10, 64)
+	return nil
 }
 
 func buildReleaseData(cfg *config.Config, grouped map[string]map[int]*changes.Entries, version, timestamp string) templatehelper.ReleaseData {

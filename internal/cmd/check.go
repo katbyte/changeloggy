@@ -44,67 +44,59 @@ All entry types must be valid and all bodies must match their configured regex.`
 func checkPR(cmd *cobra.Command, cfg *config.Config, pr int64) error {
 	entriesDir := cfg.EntriesPathOrDefault()
 
-	paths, err := entryfile.ForPR(entriesDir, pr)
+	filePath, err := entryfile.ForPR(entriesDir, pr)
 	if err != nil {
 		return err
 	}
 
-	if len(paths) == 0 {
+	if filePath == "" {
 		expected := filepath.Join(entriesDir, fmt.Sprintf("%d.%s", pr, cfg.EntryFormatOrDefault()))
 		return fmt.Errorf("no changelog entry found for PR #%d (expected %s)", pr, expected)
 	}
 
-	totalEntries := 0
-	for _, path := range paths {
-		count, err := validateFile(cfg, path)
-		if err != nil {
-			return err
-		}
-		totalEntries += count
+	count, err := validateFile(cfg, filePath)
+	if err != nil {
+		return err
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "changelog entry for PR #%d is valid (%s)\n", pr, entryCount(totalEntries))
+	fmt.Fprintf(cmd.OutOrStdout(), "changelog entry for PR #%d is valid (%s)\n", pr, entryCount(count))
 	return nil
 }
 
 func checkAll(cmd *cobra.Command, cfg *config.Config) error {
 	entriesDir := cfg.EntriesPathOrDefault()
 
-	files, err := os.ReadDir(entriesDir)
+	files, skipped, err := entryfile.List(entriesDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("entries directory not found (%s)", entriesDir)
 		}
-		return fmt.Errorf("reading entries directory (%s): %w", entriesDir, err)
+		return err
 	}
 
-	var entryFiles []string
-	for _, f := range files {
-		if f.IsDir() || !entryfile.Supported(f.Name()) {
-			continue
-		}
-		if pr, err := prFromFilename(f.Name()); err != nil || pr < 1 {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: filename is not a valid PR number\n", f.Name())
-			continue
-		}
-		entryFiles = append(entryFiles, filepath.Join(entriesDir, f.Name()))
-	}
+	warnSkipped(cmd, skipped)
 
-	if len(entryFiles) == 0 {
+	if len(files) == 0 {
 		return fmt.Errorf("no changelog entry files found in %s", entriesDir)
 	}
 
 	totalEntries := 0
-	for _, path := range entryFiles {
-		count, err := validateFile(cfg, path)
+	for _, f := range files {
+		count, err := validateFile(cfg, f.Path)
 		if err != nil {
 			return err
 		}
 		totalEntries += count
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "all files valid (%s across %d file(s))\n", entryCount(totalEntries), len(entryFiles))
+	fmt.Fprintf(cmd.OutOrStdout(), "all files valid (%s across %d file(s))\n", entryCount(totalEntries), len(files))
 	return nil
+}
+
+func warnSkipped(cmd *cobra.Command, skipped []string) {
+	for _, name := range skipped {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: filename is not a valid PR number\n", name)
+	}
 }
 
 func validateFile(cfg *config.Config, filePath string) (int, error) {

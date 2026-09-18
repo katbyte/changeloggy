@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -25,8 +23,9 @@ func NewAddCommand(configPath *string) *cobra.Command {
 
 Adds a new changelog entry for a pull request.
 
-If no changelog file exists for the pull request number, one will be created
-using the configured 'entry_format' (hcl, md, or yml).
+If the pull request already has a changelog file, the entry is added to it in
+whatever format it is in. Otherwise one is created using the configured
+'entry_format' (hcl, md, or yml).
 
 Run 'changeloggy types' to see all available entry types.`,
 		Args: cobra.ExactArgs(1),
@@ -53,24 +52,27 @@ Run 'changeloggy types' to see all available entry types.`,
 				return fmt.Errorf("invalid changelog entry: %w", err)
 			}
 
-			filePath := filepath.Join(cfg.EntriesPathOrDefault(), fmt.Sprintf("%d.%s", pr, cfg.EntryFormatOrDefault()))
+			entriesDir := cfg.EntriesPathOrDefault()
 
-			if err := util.EnsureDir(filePath); err != nil {
+			filePath, err := entryfile.ForPR(entriesDir, pr)
+			if err != nil {
 				return err
 			}
 
-			_, err = os.Stat(filePath)
-			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("checking for presence of file (%s): %w", filePath, err)
-			}
-
 			chs := changes.Entries{}
-			if !replace && !errors.Is(err, os.ErrNotExist) {
+			switch {
+			case filePath == "":
+				filePath = filepath.Join(entriesDir, fmt.Sprintf("%d.%s", pr, cfg.EntryFormatOrDefault()))
+			case !replace:
 				existing, err := entryfile.Read(filePath)
 				if err != nil {
 					return err
 				}
 				chs = *existing
+			}
+
+			if err := util.EnsureDir(filePath); err != nil {
+				return err
 			}
 
 			chs.Changes = append(chs.Changes, ch)

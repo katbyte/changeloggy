@@ -135,18 +135,56 @@ func TestForPR(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	for _, name := range []string{"1.hcl", "1.md", "1.txt", "12.md", "2.yml"} {
+	for _, name := range []string{"1.md", "1.txt", "12.md", "2.hcl", "2.yml"} {
 		writeFile(t, filepath.Join(dir, name), "")
 	}
 
 	got, err := ForPR(dir, 1)
+	if err != nil || got != filepath.Join(dir, "1.md") {
+		t.Fatalf("expected %s, got: %q, %v", filepath.Join(dir, "1.md"), got, err)
+	}
+
+	got, err = ForPR(dir, 3)
+	if err != nil || got != "" {
+		t.Fatalf("expected no file, got: %q, %v", got, err)
+	}
+
+	_, err = ForPR(dir, 2)
+	if err == nil || !strings.Contains(err.Error(), "PR #2 has more than one changelog entry file") {
+		t.Fatalf("expected duplicate error, got: %v", err)
+	}
+}
+
+func TestList(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	for _, name := range []string{"12.yml", "3.md", "3.txt", "0.hcl", "README.md", "notes.txt"} {
+		writeFile(t, filepath.Join(dir, name), "")
+	}
+	if err := os.Mkdir(filepath.Join(dir, "5.hcl"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	files, skipped, err := List(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := []string{filepath.Join(dir, "1.hcl"), filepath.Join(dir, "1.md")}
-	if !slices.Equal(got, want) {
-		t.Fatalf("\ngot:  %q\nwant: %q", got, want)
+	wantFiles := []File{{Path: filepath.Join(dir, "12.yml"), PR: 12}, {Path: filepath.Join(dir, "3.md"), PR: 3}}
+	if !slices.Equal(files, wantFiles) {
+		t.Fatalf("\ngot:  %+v\nwant: %+v", files, wantFiles)
+	}
+
+	wantSkipped := []string{"0.hcl", "README.md"}
+	if !slices.Equal(skipped, wantSkipped) {
+		t.Fatalf("\ngot:  %q\nwant: %q", skipped, wantSkipped)
+	}
+
+	writeFile(t, filepath.Join(dir, "3.hcl"), "")
+	_, _, err = List(dir)
+	if err == nil || !strings.Contains(err.Error(), "PR #3 has more than one changelog entry file") {
+		t.Fatalf("expected duplicate error, got: %v", err)
 	}
 }
 
